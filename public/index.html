@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EnvSense Live Dashboard</title>
+    <!-- Include Socket.io client script -->
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e1e2e; color: #fff; padding: 20px; }
+        .container { display: flex; gap: 20px; }
+        .panel { flex: 1; background: #2a2a3b; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        h1 { text-align: center; color: #9cdcfe; margin-bottom: 30px; }
+        h2 { margin-top: 0; color: #9cdcfe; border-bottom: 2px solid #3b3b4f; padding-bottom: 10px; }
+        #logs, #metrics { height: 600px; overflow-y: auto; font-family: monospace; font-size: 14px; }
+        .log-item { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #3b3b4f; }
+        .alert { color: #f38ba8; font-weight: bold; }
+        .data-key { color: #4fc1ff; }
+        .data-val { color: #cecece; }
+        .co2-high { color: #f38ba8; }
+        .co2-normal { color: #a6e22e; }
+        .conn-status { text-align: center; margin-bottom: 20px; padding: 10px; border-radius: 4px; }
+        .connected { background: rgba(166, 226, 46, 0.2); color: #a6e22e; }
+        .disconnected { background: rgba(243, 139, 168, 0.2); color: #f38ba8; }
+    </style>
+</head>
+<body>
+
+    <h1>EnvSense Live Dashboard</h1>
+    <div id="connection-status" class="conn-status disconnected">Connecting to server...</div>
+    
+    <div class="container">
+        <!-- Live Metrics Panel -->
+        <div class="panel">
+            <h2>Live Telemetry Stream</h2>
+            <div id="metrics">Waiting for data...</div>
+        </div>
+
+        <!-- Live Rules Engine Alerts Panel -->
+        <div class="panel">
+            <h2>Rules Engine Logs & Alerts</h2>
+            <div id="logs">Listening for triggers...</div>
+        </div>
+    </div>
+
+    <script>
+        // Connect to the Socket.io server natively hosted by our backend
+        const socket = io();
+        const statusEl = document.getElementById("connection-status");
+        const metricsDiv = document.getElementById("metrics");
+        const logsDiv = document.getElementById("logs");
+        let isFirstMetric = true;
+        let isFirstLog = true;
+
+        socket.on("connect", () => {
+            statusEl.textContent = "Connected to Live Stream";
+            statusEl.className = "conn-status connected";
+        });
+
+        socket.on("disconnect", () => {
+            statusEl.textContent = "Disconnected from Live Stream";
+            statusEl.className = "conn-status disconnected";
+        });
+
+        // Listen for live telemetry broadcasts from ingestion.service.js
+        socket.on("live_telemetry", (data) => {
+            if (isFirstMetric) {
+                metricsDiv.innerHTML = "";
+                isFirstMetric = false;
+            }
+            const div = document.createElement("div");
+            div.className = "log-item";
+            const co2Class = data.co2 > 1000 ? "co2-high" : "co2-normal";
+            div.innerHTML = `
+                <span class="data-key">[${new Date().toLocaleTimeString()}]</span> 
+                <strong>${data.deviceId}</strong><br>
+                <span class="data-key">CO2:</span> <span class="${co2Class}">${data.co2} ppm</span> | 
+                <span class="data-key">Temp:</span> <span class="data-val">${data.temp}&deg;C</span> |
+                <span class="data-key">Hum:</span> <span class="data-val">${data.humidity}%</span> |
+                <span class="data-key">Occ:</span> <span class="data-val">${data.occupancy}</span>
+            `;
+            metricsDiv.prepend(div);
+            // keep max 50 items
+            if (metricsDiv.children.length > 50) {
+                metricsDiv.removeChild(metricsDiv.lastChild);
+            }
+        });
+
+        // Listen for alert triggers from rulesEngine.service.js
+        socket.on("system_alert", (data) => {
+            if (isFirstLog) {
+                logsDiv.innerHTML = "";
+                isFirstLog = false;
+            }
+            const div = document.createElement("div");
+            div.className = "log-item alert";
+            div.innerHTML = `
+                <span style="color: #fff">[${new Date().toLocaleTimeString()}]</span> 
+                ${data.deviceId}: ${data.message}
+            `;
+            logsDiv.prepend(div);
+            if (logsDiv.children.length > 50) {
+                logsDiv.removeChild(logsDiv.lastChild);
+            }
+        });
+    </script>
+</body>
+</html>
