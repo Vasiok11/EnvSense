@@ -3,7 +3,14 @@
 // ── Wi-Fi (SmartConfig Provisioning) ─────────────────────────────────────────
 #define WIFI_RETRY_MS    5000
 #define WIFI_MAX_RETRY   10
+// ── MQTT ──────────────────────────────────────────────────────────────────
+#define MQTT_BROKER_HOST "broker.hivemq.com"
+#define MQTT_BROKER_PORT 1883
+#define MQTT_TOPIC_TELEMETRY "envsense_pbl/telemetry/"
+#define MQTT_TOPIC_COMMAND   "envsense_pbl/command/"
 
+// ── Relay Control ─────────────────────────────────────────────────────────
+#define RELAY_GPIO_PIN   26
 // ── LD2410 mmWave UART ────────────────────────────────────────────────────────
 #define LD2410_UART_NUM  1          // HardwareSerial(1)
 #define LD2410_BAUD      256000
