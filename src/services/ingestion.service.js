@@ -2,6 +2,7 @@ const telemetryRepo = require('../repositories/telemetry.repo');
 const rulesEngineService = require('./rulesEngine.service');
 const telemetryEvents = require('../utils/telemetryEvents');
 const socketServer = require('../infrastructure/websocket/socketServer');
+const AQICalculator = require('../utils/aqiCalculator');
 
 class IngestionService {
     /**
@@ -22,7 +23,8 @@ class IngestionService {
                 temp: payload.temp,
                 humidity: payload.humidity,
                 occupancy: payload.occupancy || false,
-                radarEnergy: payload.radar_energy || 0
+                radarEnergy: payload.radar_energy || 0,
+                aqi: AQICalculator.calculateAQI(payload.co2)
             };
 
             // 2. Offload into Storage (InfluxDB)

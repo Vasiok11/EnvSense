@@ -1,0 +1,27 @@
+[
+    {
+        "description": "Base atmospheric CO2 (Excellent)",
+        "co2": 450,
+        "expectedRating": "Excellent"
+    },
+    {
+        "description": "Typical good indoors (Good)",
+        "co2": 850,
+        "expectedRating": "Good"
+    },
+    {
+        "description": "Crowded poorly ventilated room (Moderate)",
+        "co2": 1200,
+        "expectedRating": "Moderate"
+    },
+    {
+        "description": "Stuffy meeting room (Poor)",
+        "co2": 1800,
+        "expectedRating": "Poor"
+    },
+    {
+        "description": "Dangerous baseline (Unhealthy)",
+        "co2": 2500,
+        "expectedRating": "Unhealthy"
+    }
+]
