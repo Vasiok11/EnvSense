@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// -----------------------------------------------------------------
+// Enums
+// -----------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  USER
+  VIEWER
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  BURN_IN
+  CALIBRATING
+  UNPAIRED
+}
+
+// -----------------------------------------------------------------
+// Models
+// -----------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  
+  users     User[]
+  devices   Device[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id             String       @id @default(uuid())
+  email          String       @unique
+  passwordHash   String
+  role           Role         @default(USER)
+  
+  // A user optionally belongs to an Organization
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Device {
+  id             String       @id @default(uuid())
+  hardwareId     String       @unique // e.g., MAC address, "sim_device_001"
+  name           String
+  room           String?
+  status         DeviceStatus @default(UNPAIRED)
+  pairingToken   String?      // Encrypted with SecurityUtil
+  
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  
+  alerts         Alert[]
+  ruleThresholds DeviceRuleThreshold?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Alert {
+  id          String   @id @default(uuid())
+  
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id])
+  
+  alertType   String   // e.g., HVAC_TRIGGER, THERMAL_FREEZE, GHOST_MOTION, SENSOR_DRIFT
+  message     String
+  resolved    Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+}
+
+model DeviceRuleThreshold {
+  id        String @id @default(uuid())
+  
+  deviceId  String @unique
+  device    Device @relation(fields: [deviceId], references: [id])
+  
+  maxCo2Ppm Int    @default(1000)
+  maxTemp   Float  @default(28.0)
+  minTemp   Float  @default(15.0)
+}
