@@ -33,31 +33,38 @@ class RulesEngineService {
             state.consecutiveHighCO2 = 0;
         }
 
-        // 2. Check conditions: 3 consecutive readings AND occupancy confirmed
+        const now = Date.now();
+
+        // 2. Check conditions: 3 consecutive readings AND occupancy confirmed (Ventilation trigger)
         if (state.consecutiveHighCO2 >= REQUIRED_CONSECUTIVE_READINGS && telemetry.occupancy) {
-            
-            const now = Date.now();
-            // 3. Ensure we are outside the 15-minute cooldown window
             if ((now - state.lastTriggerTime) > COOLDOWN_PERIOD_MS) {
-                const msg = `[Rules Engine] Threshold met for ${deviceId}. Triggering ventilation.`;
-                console.log(msg);
-                telemetryEvents.emit('system_log', { level: 'warn', message: msg, deviceId, timestamp: new Date().toISOString() });
+                const msg = `[HVAC Trigger] ${deviceId}: Unhealthy CO2 (${telemetry.co2.toFixed(0)}ppm) in occupied room. Engaging Ventilation!`;
                 
                 try {
-                    if (socketServer.getIO()) socketServer.getIO().emit('system_alert', { deviceId, message: msg });
+                    if (socketServer.getIO()) socketServer.getIO().emit('system_alert', { deviceId, message: msg, type: 'critical' });
                 } catch(e) {}
                 
-                // Trigger event
                 await this.triggerVentilation(deviceId);
 
-                // Update state
                 state.lastTriggerTime = now;
                 state.consecutiveHighCO2 = 0; // Reset after trigger
-            } else {
-                const msg = `[Rules Engine] Threshold met for ${deviceId}, but event suppressed due to cooldown.`;
-                console.log(msg);
-                telemetryEvents.emit('system_log', { level: 'info', message: msg, deviceId, timestamp: new Date().toISOString() });
             }
+        }
+        
+        // 3. Evaluate Ghost Motion (High Radar Energy, but Occupancy = False)
+        if (telemetry.radarEnergy > 60 && !telemetry.occupancy) {
+            // Emits purely to UI for analytics
+            const msg = `[Ghost Anomaly] ${deviceId}: Radar detecting massive motion (${telemetry.radarEnergy.toFixed(0)} energy) but target unconfirmed!`;
+            if (socketServer.getIO()) socketServer.getIO().emit('system_alert', { deviceId, message: msg, type: 'warning' });
+        }
+        
+        // 4. Overheating / Sub-zero warnings
+        if (telemetry.temp > 28) {
+            const msg = `[Thermal Alert] ${deviceId}: Dangerously hot environment (${telemetry.temp.toFixed(1)}°C).`;
+            if (socketServer.getIO()) socketServer.getIO().emit('system_alert', { deviceId, message: msg, type: 'warning' });
+        } else if (telemetry.temp < 15) {
+            const msg = `[Thermal Alert] ${deviceId}: Freezing drop detected (${telemetry.temp.toFixed(1)}°C). Check windows.`;
+            if (socketServer.getIO()) socketServer.getIO().emit('system_alert', { deviceId, message: msg, type: 'warning' });
         }
         
         // Save state back

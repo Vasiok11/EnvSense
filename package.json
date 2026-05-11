@@ -8,7 +8,8 @@
     "dev": "nodemon src/app.js",
     "lint": "eslint src/**/*.js",
     "format": "prettier --write \"src/**/*.js\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node tests/aqi_evaluation_test.js && node tests/calibration_test.js && node tests/security_hardening_test.js && node tests/reliability_test.js",
+    "e2e": "node tests/e2e_simulation.js"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +27,7 @@
   "devDependencies": {
     "eslint": "^8.0.0",
     "nodemon": "^3.0.0",
-    "prettier": "^3.0.0"
+    "prettier": "^3.0.0",
+    "proxyquire": "^2.1.3"
   }
 }

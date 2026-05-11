@@ -3,105 +3,274 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EnvSense Live Dashboard</title>
-    <!-- Include Socket.io client script -->
+    <title>EnvSense Analytics Dashboard</title>
+    <!-- Socket.io and Chart.js -->
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e1e2e; color: #fff; padding: 20px; }
-        .container { display: flex; gap: 20px; }
-        .panel { flex: 1; background: #2a2a3b; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        h1 { text-align: center; color: #9cdcfe; margin-bottom: 30px; }
-        h2 { margin-top: 0; color: #9cdcfe; border-bottom: 2px solid #3b3b4f; padding-bottom: 10px; }
-        #logs, #metrics { height: 600px; overflow-y: auto; font-family: monospace; font-size: 14px; }
-        .log-item { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #3b3b4f; }
-        .alert { color: #f38ba8; font-weight: bold; }
-        .data-key { color: #4fc1ff; }
-        .data-val { color: #cecece; }
-        .co2-high { color: #f38ba8; }
-        .co2-normal { color: #a6e22e; }
-        .conn-status { text-align: center; margin-bottom: 20px; padding: 10px; border-radius: 4px; }
-        .connected { background: rgba(166, 226, 46, 0.2); color: #a6e22e; }
-        .disconnected { background: rgba(243, 139, 168, 0.2); color: #f38ba8; }
+        :root {
+            --bg-base: #11111b;
+            --bg-panel: #1e1e2e;
+            --bg-surface: #313244;
+            --text-main: #cdd6f4;
+            --text-muted: #a6adc8;
+            --accent-blue: #89b4fa;
+            --accent-green: #a6e3a1;
+            --accent-red: #f38ba8;
+            --accent-yellow: #f9e2af;
+            --accent-purple: #cba6f7;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: var(--bg-base); 
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 20px; 
+            box-sizing: border-box;
+        }
+        
+        h1 { text-align: center; color: var(--accent-blue); margin-top: 0; margin-bottom: 20px; }
+        h2 { margin-top: 0; color: var(--accent-purple); font-size: 1.1rem; border-bottom: 2px solid var(--bg-surface); padding-bottom: 10px; }
+        
+        .conn-status { text-align: center; padding: 8px; border-radius: 6px; font-weight: bold; margin-bottom: 20px; }
+        .connected { background: rgba(166, 227, 161, 0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+        .disconnected { background: rgba(243, 139, 168, 0.15); color: var(--accent-red); border: 1px solid var(--accent-red); }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: auto auto auto;
+            gap: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .panel { 
+            background: var(--bg-panel); 
+            border-radius: 12px; 
+            padding: 20px; 
+            box-shadow: 0 8px 16px rgba(0,0,0,0.5); 
+            border: 1px solid var(--bg-surface);
+        }
+
+        .span-2 { grid-column: span 2; }
+        .span-3 { grid-column: span 3; }
+
+        .chart-wrapper { height: 250px; position: relative; }
+        
+        /* Stats Tiles */
+        .stats-container { display: flex; justify-content: space-between; gap: 15px; }
+        .stat-tile { 
+            flex: 1; background: var(--bg-surface); border-radius: 8px; padding: 15px; 
+            text-align: center; display: flex; flex-direction: column; justify-content: center;
+        }
+        .stat-value { font-size: 2rem; font-weight: bold; margin: 10px 0; }
+        .stat-title { color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Logs Console */
+        #logs, #metrics { 
+            height: 300px; 
+            overflow-y: auto; 
+            font-family: 'Consolas', 'Courier New', monospace; 
+            font-size: 13px; 
+            background: #000;
+            padding: 10px;
+            border-radius: 6px;
+        }
+        .log-item { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #333; }
+        
+        .color-blue { color: var(--accent-blue); }
+        .color-green { color: var(--accent-green); }
+        .color-warning { color: var(--accent-yellow); }
+        .color-critical { color: var(--accent-red); font-weight: bold; }
+        .color-muted { color: var(--text-muted); }
+        .color-purple { color: var(--accent-purple); }
+
     </style>
 </head>
 <body>
 
-    <h1>EnvSense Live Dashboard</h1>
-    <div id="connection-status" class="conn-status disconnected">Connecting to server...</div>
+    <h1>EnvSense Advanced Operations Dashboard</h1>
+    <div id="connection-status" class="conn-status disconnected">Awaiting Node Backend...</div>
     
-    <div class="container">
-        <!-- Live Metrics Panel -->
-        <div class="panel">
-            <h2>Live Telemetry Stream</h2>
-            <div id="metrics">Waiting for data...</div>
+    <div class="dashboard-grid">
+        
+        <!-- Top Stats Row -->
+        <div class="panel span-3 stats-container">
+            <div class="stat-tile">
+                <div class="stat-title">Air Quality Index (AQI)</div>
+                <div id="tile-aqi" class="stat-value color-green">--</div>
+                <div id="tile-aqi-desc" class="color-muted" style="font-size:0.8rem">Waiting for data</div>
+            </div>
+            <div class="stat-tile">
+                <div class="stat-title">Thermal Comfort</div>
+                <div id="tile-comfort" class="stat-value color-blue">--</div>
+                <div id="tile-comfort-desc" class="color-muted" style="font-size:0.8rem">Waiting for data</div>
+            </div>
+            <div class="stat-tile">
+                <div class="stat-title">Occupancy State</div>
+                <div id="tile-occ" class="stat-value color-muted">Unknown</div>
+                <div id="tile-occ-desc" class="color-muted" style="font-size:0.8rem">Radar: 0J energy</div>
+            </div>
         </div>
 
-        <!-- Live Rules Engine Alerts Panel -->
-        <div class="panel">
-            <h2>Rules Engine Logs & Alerts</h2>
-            <div id="logs">Listening for triggers...</div>
+        <!-- Middle Charts Row -->
+        <div class="panel span-2">
+            <h2>Sensory Gas & Comfort Index (CO2, Temp, Hum)</h2>
+            <div class="chart-wrapper">
+                <canvas id="gasChart"></canvas>
+            </div>
+        </div>
+
+        <div class="panel span-1">
+            <h2>mmWave Radar Energy Stream (Motion)</h2>
+            <div class="chart-wrapper">
+                <canvas id="radarChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Bottom Consoles -->
+        <div class="panel span-2">
+            <h2>Raw Telemetry Stream</h2>
+            <div id="metrics">Initializing firehose...</div>
+        </div>
+
+        <div class="panel span-1">
+            <h2>Rules Engine Triggers</h2>
+            <div id="logs">Waiting for anomalies...</div>
         </div>
     </div>
 
     <script>
-        // Connect to the Socket.io server natively hosted by our backend
         const socket = io();
         const statusEl = document.getElementById("connection-status");
-        const metricsDiv = document.getElementById("metrics");
-        const logsDiv = document.getElementById("logs");
-        let isFirstMetric = true;
-        let isFirstLog = true;
+        
+        // Tiles
+        const tAqi = document.getElementById("tile-aqi");
+        const tAqiDesc = document.getElementById("tile-aqi-desc");
+        const tComfort = document.getElementById("tile-comfort");
+        const tComfortDesc = document.getElementById("tile-comfort-desc");
+        const tOcc = document.getElementById("tile-occ");
+        const tOccDesc = document.getElementById("tile-occ-desc");
 
         socket.on("connect", () => {
-            statusEl.textContent = "Connected to Live Stream";
+            statusEl.textContent = "CONNECTED (TLS)";
             statusEl.className = "conn-status connected";
         });
-
         socket.on("disconnect", () => {
-            statusEl.textContent = "Disconnected from Live Stream";
+            statusEl.textContent = "DISCONNECTED";
             statusEl.className = "conn-status disconnected";
         });
 
-        // Listen for live telemetry broadcasts from ingestion.service.js
-        socket.on("live_telemetry", (data) => {
-            if (isFirstMetric) {
-                metricsDiv.innerHTML = "";
-                isFirstMetric = false;
-            }
-            const div = document.createElement("div");
-            div.className = "log-item";
-            const co2Class = data.co2 > 1000 ? "co2-high" : "co2-normal";
-            div.innerHTML = `
-                <span class="data-key">[${new Date().toLocaleTimeString()}]</span> 
-                <strong>${data.deviceId}</strong><br>
-                <span class="data-key">CO2:</span> <span class="${co2Class}">${data.co2} ppm</span> | 
-                <span class="data-key">Temp:</span> <span class="data-val">${data.temp}&deg;C</span> |
-                <span class="data-key">Hum:</span> <span class="data-val">${data.humidity}%</span> |
-                <span class="data-key">Occ:</span> <span class="data-val">${data.occupancy}</span>
-            `;
-            metricsDiv.prepend(div);
-            // keep max 50 items
-            if (metricsDiv.children.length > 50) {
-                metricsDiv.removeChild(metricsDiv.lastChild);
+        // Setup Main Chart (CO2, Temp, Hum)
+        const gasCtx = document.getElementById('gasChart').getContext('2d');
+        const gasChart = new Chart(gasCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'CO2 (ppm)', data: [], borderColor: '#f38ba8', backgroundColor: 'rgba(243, 139, 168, 0.1)', borderWidth: 2, fill: true, yAxisID: 'y' },
+                    { label: 'Temp (°C)', data: [], borderColor: '#f9e2af', borderDash: [5, 5], yAxisID: 'y1' },
+                    { label: 'Humidity (%)', data: [], borderColor: '#89b4fa', borderDash: [2, 2], yAxisID: 'y1' }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { color: '#a6adc8' }, grid: { color: '#313244' } },
+                    y: { type: 'linear', display: true, position: 'left', ticks: { color: '#f38ba8' }, grid: { color: '#313244' } },
+                    y1: { type: 'linear', display: true, position: 'right', ticks: { color: '#89b4fa' }, grid: { drawOnChartArea: false } }
+                },
+                plugins: { legend: { labels: { color: '#cdd6f4' } } }
             }
         });
 
-        // Listen for alert triggers from rulesEngine.service.js
-        socket.on("system_alert", (data) => {
-            if (isFirstLog) {
-                logsDiv.innerHTML = "";
-                isFirstLog = false;
+        // Setup Radar Chart (mmWave)
+        const radarCtx = document.getElementById('radarChart').getContext('2d');
+        const radarChart = new Chart(radarCtx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{ label: 'Radar Energy (J)', data: [], backgroundColor: '#cba6f7', borderRadius: 4 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { display: false }, grid: { display: false } },
+                    y: { ticks: { color: '#cba6f7' }, grid: { color: '#313244' }, min: 0, max: 100 }
+                },
+                plugins: { legend: { display: false } }
             }
+        });
+
+        // --- Data Handling ---
+        socket.on("live_telemetry", (data) => {
+            const timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            // 1. Update Tiles
+            if (data.aqi) {
+                tAqi.textContent = `${data.aqi.rating} (${data.aqi.score})`;
+                tAqi.className = `stat-value ${data.co2 > 1000 ? 'color-critical' : 'color-green'}`;
+                tAqiDesc.textContent = `${data.co2.toFixed(0)} ppm current load`;
+            }
+            if (data.comfort) {
+                tComfort.textContent = `${data.comfort.rating} (${data.comfort.score}/100)`;
+                tComfort.className = `stat-value ${data.comfort.score < 80 ? 'color-warning' : 'color-blue'}`;
+                tComfortDesc.textContent = `${data.temp.toFixed(1)}°C | ${data.humidity.toFixed(1)}% Rh`;
+            }
+            
+            tOcc.textContent = data.occupancy ? "Occupied" : "Empty";
+            tOcc.className = `stat-value ${data.occupancy ? 'color-warning' : 'color-muted'}`;
+            tOccDesc.textContent = `Radar Energy: ${data.radarEnergy.toFixed(1)} J/s`;
+
+            // 2. Update Charts
+            gasChart.data.labels.push(timeLabel);
+            gasChart.data.datasets[0].data.push(data.co2);
+            gasChart.data.datasets[1].data.push(data.temp);
+            gasChart.data.datasets[2].data.push(data.humidity);
+            if (gasChart.data.labels.length > 25) {
+                gasChart.data.labels.shift();
+                gasChart.data.datasets.forEach(d => d.data.shift());
+            }
+            gasChart.update();
+
+            radarChart.data.labels.push(timeLabel);
+            radarChart.data.datasets[0].data.push(data.radarEnergy);
+            if (radarChart.data.labels.length > 25) {
+                radarChart.data.labels.shift();
+                radarChart.data.datasets[0].data.shift();
+            }
+            radarChart.update();
+
+            // 3. Update Text Firehose
+            const metricsDiv = document.getElementById("metrics");
             const div = document.createElement("div");
-            div.className = "log-item alert";
+            div.className = "log-item";
             div.innerHTML = `
-                <span style="color: #fff">[${new Date().toLocaleTimeString()}]</span> 
-                ${data.deviceId}: ${data.message}
+                <span class="color-muted">[${timeLabel}]</span> <span class="color-blue">${data.deviceId}</span>
+                CO2: <span class="${data.co2 > 1000 ? 'color-critical' : 'color-green'}">${data.co2.toFixed(0)}</span> | 
+                T: ${data.temp.toFixed(1)}° | 
+                H: ${data.humidity.toFixed(1)}% | 
+                E: <span class="color-purple">${data.radarEnergy.toFixed(0)}j</span>
             `;
+            metricsDiv.prepend(div);
+            if (metricsDiv.children.length >= 40) metricsDiv.removeChild(metricsDiv.lastChild);
+            if (metricsDiv.innerHTML.includes("Initializing firehose...")) metricsDiv.innerHTML = "";
+        });
+
+        // --- Rules Triggers Logging ---
+        socket.on("system_alert", (data) => {
+            const logsDiv = document.getElementById("logs");
+            const div = document.createElement("div");
+            
+            const colorClass = data.type === 'critical' ? 'color-critical' : 'color-warning';
+            div.className = `log-item ${colorClass}`;
+            div.innerHTML = `> [${new Date().toLocaleTimeString()}] ${data.message}`;
+            
             logsDiv.prepend(div);
-            if (logsDiv.children.length > 50) {
-                logsDiv.removeChild(logsDiv.lastChild);
-            }
+            if (logsDiv.children.length >= 40) logsDiv.removeChild(logsDiv.lastChild);
+            if (logsDiv.innerHTML.includes("Waiting for anomalies...")) logsDiv.innerHTML = "";
         });
     </script>
 </body>
