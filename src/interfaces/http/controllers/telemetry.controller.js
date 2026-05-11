@@ -13,16 +13,23 @@ class TelemetryController {
         // Send an initial event to establish connection
         res.write('data: {"status": "connected"}\n\n');
 
-        const listener = (data) => {
+        const telemetryListener = (data) => {
             // Write to SSE
-            res.write(`data: ${JSON.stringify(data)}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: 'telemetry', data })}\n\n`);
         };
 
-        telemetryEvents.on('new_telemetry', listener);
+        const logListener = (logData) => {
+            // Write to SSE
+            res.write(`data: ${JSON.stringify({ type: 'log', data: logData })}\n\n`);
+        };
+
+        telemetryEvents.on('new_telemetry', telemetryListener);
+        telemetryEvents.on('system_log', logListener);
 
         // When the frontend connection closes, remove listener to avoid memory leak
         req.on('close', () => {
-            telemetryEvents.removeListener('new_telemetry', listener);
+            telemetryEvents.removeListener('new_telemetry', telemetryListener);
+            telemetryEvents.removeListener('system_log', logListener);
         });
     }
 
