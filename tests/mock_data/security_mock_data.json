@@ -1,0 +1,14 @@
+{
+    "devices": [
+        {
+            "deviceId": "edge_esp_001",
+            "plainToken": "d3vic3_t0k3n_v3ry_s3cur3",
+            "description": "Valid pairing token"
+        },
+        {
+            "deviceId": "edge_esp_002",
+            "plainToken": "ESP32_WROOM_C3_SECRET_999",
+            "description": "Standard edge token"
+        }
+    ]
+}
