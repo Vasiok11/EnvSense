@@ -3,6 +3,7 @@ const rulesEngineService = require('./rulesEngine.service');
 const telemetryEvents = require('../utils/telemetryEvents');
 const socketServer = require('../infrastructure/websocket/socketServer');
 const AQICalculator = require('../utils/aqiCalculator');
+const ComfortCalculator = require('../utils/comfortCalculator');
 const logger = require('../utils/logger');
 const metrics = require('../utils/metrics');
 
@@ -29,7 +30,8 @@ class IngestionService {
                 humidity: payload.humidity,
                 occupancy: payload.occupancy || false,
                 radarEnergy: payload.radar_energy || 0,
-                aqi: AQICalculator.calculateAQI(payload.co2)
+                aqi: AQICalculator.calculateAQI(payload.co2),
+                comfort: ComfortCalculator.calculate(payload.temp, payload.humidity)
             };
 
             metrics.increment('telemetry_ingested_total');
