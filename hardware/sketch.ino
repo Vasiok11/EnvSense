@@ -47,6 +47,7 @@
 #include "wifi_manager.h"
 #include "watchdog.h"
 #include "tasks.h"
+#include "mqtt_client.h"
 
 void setup() {
     Serial.begin(115200);
@@ -59,19 +60,24 @@ void setup() {
 
     // Hardware watchdog
     watchdog_init();
+    
+    // MQTT client configuration
+    mqtt_init();
 
     // ── Launch tasks ───────────────────────────────────────────────────────
     // Using xTaskCreate for compatibility with single-core RISC-V architectures (e.g. ESP32-C3)
     xTaskCreate(wifi_task,         "WiFi",    STACK_WIFI,    NULL, TASK_PRIO_WIFI,    NULL);
-    xTaskCreate(serial_print_task, "Serial",  STACK_SERIAL,  NULL, TASK_PRIO_SERIAL,  NULL);
+    xTaskCreate(mqtt_publish_task, "MQTT",    STACK_SERIAL,  NULL, TASK_PRIO_SERIAL,  NULL);
     xTaskCreate(radar_task,        "Radar",   STACK_RADAR,   NULL, TASK_PRIO_RADAR,   NULL);
     xTaskCreate(sensors_task,      "Sensors", STACK_SENSORS, NULL, TASK_PRIO_SENSORS, NULL);
+    xTaskCreate(relay_task,        "Relay",   2048,          NULL, 2,                 NULL);
 
     Serial.println("[Main] All tasks launched.");
 }
 
 void loop() {
-    // Main loop only feeds the watchdog; work is in tasks
+    // Main loop feeds the watchdog and processes MQTT callbacks
     watchdog_reset();
-    vTaskDelay(pdMS_TO_TICKS(5000));
+    mqtt_loop();
+    vTaskDelay(pdMS_TO_TICKS(10));
 }

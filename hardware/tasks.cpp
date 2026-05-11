@@ -7,6 +7,7 @@
 #include "mq7.h"
 #include "serializer.h"
 #include "watchdog.h"
+#include "mqtt_client.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <esp_task_wdt.h>
@@ -70,8 +71,8 @@ void sensors_task(void* pv) {
     }
 }
 
-// ── Serial / Serialization Task (Core 0, priority 1) ─────────────────────────
-void serial_print_task(void* pv) {
+// ── Serial / Serialization / MQTT Task (Core 0, priority 1) ────────────────
+void mqtt_publish_task(void* pv) {
     esp_task_wdt_add(NULL);
     SensorPayload_t snap;
 
@@ -82,7 +83,11 @@ void serial_print_task(void* pv) {
         }
 
         // JSON output
-        Serial.println(serializer_to_json(snap));
+        String json = serializer_to_json(snap);
+        Serial.println(json);
+        
+        // Publish to MQTT
+        mqtt_publish(json.c_str());
 
         // Binary output (hex dump)
         uint8_t bin[20];
@@ -93,5 +98,34 @@ void serial_print_task(void* pv) {
 
         esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(SERIAL_PRINT_MS));
+    }
+}
+
+// ── Relay Task (Core 1) ──────────────────────────────────────────────────────
+static QueueHandle_t relay_queue = NULL;
+
+void relay_command_callback(bool ventilation_on) {
+    if (relay_queue != NULL) {
+        xQueueSend(relay_queue, &ventilation_on, 0);
+    }
+}
+
+void relay_task(void* pv) {
+    esp_task_wdt_add(NULL);
+    pinMode(RELAY_GPIO_PIN, OUTPUT);
+    digitalWrite(RELAY_GPIO_PIN, LOW);
+    
+    relay_queue = xQueueCreate(5, sizeof(bool));
+    mqtt_set_command_callback(relay_command_callback);
+    
+    bool state = false;
+    for (;;) {
+        if (xQueueReceive(relay_queue, &state, pdMS_TO_TICKS(100)) == pdTRUE) {
+            digitalWrite(RELAY_GPIO_PIN, state ? HIGH : LOW);
+            Serial.printf("[Relay] Ventilation turned %s\n", state ? "ON" : "OFF");
+        }
+        
+        esp_task_wdt_reset();
+        vTaskDelay(pdMS_TO_TICKS(100)); // Non-blocking wait
     }
 }
