@@ -4,6 +4,7 @@ const http = require('http');
 const mqttClient = require('./infrastructure/mqtt/mqttClient');
 const startSubscribers = require('./interfaces/mqtt/subscribers');
 const socketServer = require('./infrastructure/websocket/socketServer');
+const metrics = require('./utils/metrics');
 
 // Routes
 const authRoutes = require('./interfaces/http/routes/auth.routes');
@@ -49,6 +50,15 @@ const bootstrap = async () => {
         server.listen(PORT, () => {
             console.log(`🚀 EnvSense Backend listening on port ${PORT}`);
             console.log(`➡️  Health check: http://localhost:${PORT}/health`);
+
+            // 4. Periodically render the ASCII performance metrics dashboard
+            // Only output if we're actually processing things to avoid spamming an idle console
+            setInterval(() => {
+                if (Object.keys(metrics.counters).length > 0) {
+                    process.stdout.write('\x1Bc'); // clear screen buffer slightly for neatness
+                    metrics.renderDashboard();
+                }
+            }, 5000);
         });
 
     } catch (error) {
