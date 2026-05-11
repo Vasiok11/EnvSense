@@ -22,6 +22,7 @@ class AQICalculator {
         if (co2_ppm <= 800) {
             // Excellent: 400 - 800 ppm
             score = this.interpolate(co2_ppm, 400, 800, 0, 50);
+            score = Math.max(0, score); // Prevent negative AQI for values < 400ppm
             rating = 'Excellent';
             description = 'Air quality is considered satisfactory, and air pollution poses little or no risk.';
         } else if (co2_ppm <= 1000) {

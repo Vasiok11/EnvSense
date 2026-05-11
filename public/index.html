@@ -6,6 +6,7 @@
     <title>EnvSense Live Dashboard</title>
     <!-- Include Socket.io client script -->
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e1e2e; color: #fff; padding: 20px; }
         .container { display: flex; gap: 20px; }
@@ -22,6 +23,7 @@
         .conn-status { text-align: center; margin-bottom: 20px; padding: 10px; border-radius: 4px; }
         .connected { background: rgba(166, 226, 46, 0.2); color: #a6e22e; }
         .disconnected { background: rgba(243, 139, 168, 0.2); color: #f38ba8; }
+        .chart-container { margin-bottom: 20px; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -29,6 +31,12 @@
     <h1>EnvSense Live Dashboard</h1>
     <div id="connection-status" class="conn-status disconnected">Connecting to server...</div>
     
+    <div class="container chart-container">
+        <div class="panel" style="height: 300px;">
+            <canvas id="liveChart"></canvas>
+        </div>
+    </div>
+
     <div class="container">
         <!-- Live Metrics Panel -->
         <div class="panel">
@@ -62,6 +70,35 @@
             statusEl.className = "conn-status disconnected";
         });
 
+        // Setup Chart.js
+        const ctx = document.getElementById('liveChart').getContext('2d');
+        const liveChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CO2 (ppm)',
+                    data: [],
+                    borderColor: '#f38ba8',
+                    backgroundColor: 'rgba(243, 139, 168, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { color: '#cecece' }, grid: { color: '#3b3b4f' } },
+                    y: { ticks: { color: '#cecece' }, grid: { color: '#3b3b4f' }, suggestedMin: 400 }
+                },
+                plugins: {
+                    legend: { labels: { color: '#fff' } }
+                }
+            }
+        });
+
         // Listen for live telemetry broadcasts from ingestion.service.js
         socket.on("live_telemetry", (data) => {
             if (isFirstMetric) {
@@ -85,6 +122,16 @@
             if (metricsDiv.children.length > 50) {
                 metricsDiv.removeChild(metricsDiv.lastChild);
             }
+
+            // Update Chart
+            const timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            liveChart.data.labels.push(timeLabel);
+            liveChart.data.datasets[0].data.push(data.co2);
+            if (liveChart.data.labels.length > 20) {
+                liveChart.data.labels.shift();
+                liveChart.data.datasets[0].data.shift();
+            }
+            liveChart.update();
         });
 
         // Listen for alert triggers from rulesEngine.service.js
