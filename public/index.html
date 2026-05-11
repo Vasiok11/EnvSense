@@ -71,12 +71,13 @@
             const div = document.createElement("div");
             div.className = "log-item";
             const co2Class = data.co2 > 1000 ? "co2-high" : "co2-normal";
+            const aqiText = data.aqi ? ` | <span class="data-key">AQI:</span> <span class="${co2Class}">${data.aqi.rating} (${data.aqi.score})</span>` : "";
             div.innerHTML = `
                 <span class="data-key">[${new Date().toLocaleTimeString()}]</span> 
                 <strong>${data.deviceId}</strong><br>
-                <span class="data-key">CO2:</span> <span class="${co2Class}">${data.co2} ppm</span> | 
-                <span class="data-key">Temp:</span> <span class="data-val">${data.temp}&deg;C</span> |
-                <span class="data-key">Hum:</span> <span class="data-val">${data.humidity}%</span> |
+                <span class="data-key">CO2:</span> <span class="${co2Class}">${data.co2.toFixed(0)} ppm</span>${aqiText} | 
+                <span class="data-key">Temp:</span> <span class="data-val">${data.temp.toFixed(1)}&deg;C</span> |
+                <span class="data-key">Hum:</span> <span class="data-val">${data.humidity.toFixed(1)}%</span> |
                 <span class="data-key">Occ:</span> <span class="data-val">${data.occupancy}</span>
             `;
             metricsDiv.prepend(div);
